@@ -1,6 +1,6 @@
 import { type Tag } from "arweave/web/lib/transaction";
 import { type connect } from "@permaweb/aoconnect";
-import Quantity from "./Quantity"
+import Quantity from "./Quantity";
 
 /**
  * Dummy ID
@@ -20,6 +20,7 @@ export interface TokenInfo {
   Ticker?: string;
   Denomination: bigint;
   Logo?: string;
+  Mirror?: string;
 }
 
 /**

@@ -1,4 +1,3 @@
-
 import { AoInstance, TokenInfo, Id, Owner, getTagValue, Message, Balances, isAddress } from "./utils";
 import { connect, createDataItemSigner } from "@permaweb/aoconnect";
 import Quantity from "./Quantity";
@@ -23,17 +22,19 @@ export default async function Token(
     const Name = getTagValue("Name", msg.Tags);
     const Denomination = getTagValue("Denomination", msg.Tags);
     const Logo = getTagValue("Logo", msg.Tags);
+    const Mirror = getTagValue("Balance-Mirror", msg.Tags);
 
     if (!Ticker && !Name) continue;
 
-    // if the message was found, return the token details  
+    // if the message was found, return the token details
     return new TokenInstance(
       id,
       {
         Name,
         Ticker,
         Denomination: BigInt(Denomination || 0),
-        Logo
+        Logo,
+        Mirror,
       },
       signer,
       ao
@@ -99,16 +100,19 @@ export class TokenInstance {
    */
   async getBalance(address: string) {
     // query ao
+    const process = this.#info.Mirror ? this.#info.Mirror : this.#id;
     const res = await this.#ao.dryrun({
       Id,
       Owner: address,
-      process: this.#id,
+      process,
       tags: [{ name: "Action", value: "Balance" }]
     });
-  
+
     // find result message
     for (const msg of res.Messages as Message[]) {
-      const balance = getTagValue("Balance", msg.Tags);
+      const balance = this.#info.Mirror
+        ? msg.Data
+        : getTagValue("Balance", msg.Tags);
 
       // return balance if found
       if (balance) {
@@ -118,7 +122,7 @@ export class TokenInstance {
         );
       }
     }
-  
+
     // default return
     return new Quantity(0, this.#info.Denomination);
   }
@@ -136,20 +140,20 @@ export class TokenInstance {
       tags: [{ name: "Action", value: "Balances" }]
     });
     const bals: Balances = {};
-      
+
     // find result message
-    for (const msg of res.Messages as Message[]) {      
+    for (const msg of res.Messages as Message[]) {
       // return balance if found
       if (msg.Target !== Owner|| !msg.Data) continue;
-      
+
       try {
         const raw = JSON.parse(msg.Data);
 
         for (const addr in raw) {
           bals[addr] = new Quantity(
-            BigInt(raw[addr]),
+            BigInt(raw[addr]), 
             this.#info.Denomination
-          );
+            );
         }
       } catch {}
     }
