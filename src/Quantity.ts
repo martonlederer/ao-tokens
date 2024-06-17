@@ -483,16 +483,40 @@ export default class Quantity {
   }
 
   /**
-   * Raise one quantity to the power of an integer. This can cause precision loss
+   * Raise one quantity to the power of another. This can cause precision loss
    * @param x Quantity to raise
    * @param y Exponent
    * @returns Result of the power operation
    */
-  static __pow(x: Quantity, y: number) {
-    if (!Number.isInteger(y)) {
-      throw new Error("Cannot raise Quantity to the power of a non-integer number");
+  static __pow(x: Quantity, y: Quantity | bigint) {
+    if (typeof y !== "bigint" && !Quantity.isQuantity(y)) {
+      throw new Error("Invalid exponent");
     }
-    if (y === 0) return new Quantity(0, x.#D);
+
+    // power of 0
+    if ((typeof y === "bigint" && y === 0n) || Quantity.isQuantity(y) && Quantity.eq(y, new Quantity(0n, y.#D))) {
+      return Quantity.__one(x.#D);
+    }
+
+    // integer power
+    if (typeof y === "bigint") {
+      const positivePower = new Quantity(
+        x.#qty ** (y > 0 ? y : -y),
+        x.#D ** y
+      )._convert(x.#D);
+
+      // negative exponent
+      if (y > 0) return positivePower;
+
+      // calculate negative exponent
+      const result = Quantity.__one(x.#D);
+      result._div(positivePower);
+
+      return result;
+    }
+
+    // ensure same denomination
+    [x, y] = Quantity.sameDenomination(x, y);
 
     let res = x.clone();
 
@@ -512,11 +536,11 @@ export default class Quantity {
   }
 
   /**
-   * Raise one quantity to the power of an integer (in-place). This can cause
+   * Raise one quantity to the power of another (in-place). This can cause
    * precision loss
    * @param y Exponent
    */
-  _pow(y: number) {
+  _pow(y: Quantity | bigint) {
     const res = Quantity.__convert(
       Quantity.__pow(this, y),
       this.#D
